@@ -1,14 +1,11 @@
+-- Define the Tree data type
 data Tree = NumNode Double         -- Leaf node for numbers
           | OpNode Char Tree Tree  -- Operator node with two subtrees
           deriving (Show)
 
--- Parser for basic expressions with operator precedence
-parse :: String -> Tree
-parse = parseAddSub   -- Start with the lowest precedence level
-
 -- Evaluator for the parse tree
 eval :: Tree -> Double
-eval (NumNode n) = n  -- Base case: return the number for a leaf node
+eval (NumNode n) = n                              -- Base case: return the number for a leaf node
 eval (OpNode '+' lhs rhs) = eval lhs + eval rhs  -- Evaluate and add
 eval (OpNode '-' lhs rhs) = eval lhs - eval rhs  -- Evaluate and subtract
 eval (OpNode '*' lhs rhs) = eval lhs * eval rhs  -- Evaluate and multiply
@@ -16,53 +13,82 @@ eval (OpNode '/' lhs rhs) = eval lhs / eval rhs  -- Evaluate and divide
 eval (OpNode '^' lhs rhs) = eval lhs ** eval rhs -- Evaluate exponentiation
 
 -- Parse addition and subtraction
-parseAddSub :: String -> Tree
+parseAddSub :: String -> (Tree, String)
 parseAddSub input =
     let (lhs, rest) = parseMulDiv input  -- Parse the left-hand side
     in case rest of
-        ('+':rhs) -> OpNode '+' lhs (parseAddSub rhs)  -- Parse the rest recursively
-        ('-':rhs) -> OpNode '-' lhs (parseAddSub rhs)  -- Handle subtraction
-        _         -> lhs                              -- No more operators at this level
+        ('+':rhs) -> 
+            let (rhsTree, rest') = parseAddSub rhs
+            in (OpNode '+' lhs rhsTree, rest')
+        ('-':rhs) -> 
+            let (rhsTree, rest') = parseAddSub rhs
+            in (OpNode '-' lhs rhsTree, rest')
+        _ -> (lhs, rest)  -- No more operators at this level
 
 -- Parse multiplication and division
 parseMulDiv :: String -> (Tree, String)
 parseMulDiv input =
     let (lhs, rest) = parseExp input  -- Parse the left-hand side
     in case rest of
-        ('*':rhs) -> let (rhsTree, rest') = parseMulDiv rhs
-                     in (OpNode '*' lhs rhsTree, rest')
-        ('/':rhs) -> let (rhsTree, rest') = parseMulDiv rhs
-                     in (OpNode '/' lhs rhsTree, rest')
-        _         -> (lhs, rest)  -- No more operators at this level
+        ('*':rhs) -> 
+            let (rhsTree, rest') = parseMulDiv rhs
+            in (OpNode '*' lhs rhsTree, rest')
+        ('/':rhs) -> 
+            let (rhsTree, rest') = parseMulDiv rhs
+            in (OpNode '/' lhs rhsTree, rest')
+        _ -> (lhs, rest)  -- No more operators at this level
 
 -- Parse exponentiation
 parseExp :: String -> (Tree, String)
 parseExp input =
     let (lhs, rest) = parseFactor input  -- Parse the left-hand side
     in case rest of
-        ('^':rhs) -> let (rhsTree, rest') = parseExp rhs
-                     in (OpNode '^' lhs rhsTree, rest')
-        _         -> (lhs, rest)  -- No more operators at this level
+        ('^':rhs) -> 
+            let (rhsTree, rest') = parseExp rhs
+            in (OpNode '^' lhs rhsTree, rest')
+        _ -> (lhs, rest)  -- No more operators at this level
 
 -- Parse a factor (number or parenthesis)
 parseFactor :: String -> (Tree, String)
-parseFactor ('(':rest) = 
-    let parsedExpr = parseAddSub rest  -- Parse the expression inside parentheses
-        rest' = drop 1 $ dropWhile (/= ')') rest  -- Skip past the closing ')'
-    in (parsedExpr, rest')  -- Return the parsed expression and remaining input
-parseFactor input = parseNum input  -- Otherwise, parse a number
-
+parseFactor ('(':rest) =
+    let (parsedExpr, rest') = parseAddSub rest  -- Parse inside parentheses recursively
+    in case rest' of
+        (')':rest'') -> (parsedExpr, rest'')   -- Closing parenthesis
+        _            -> error "Mismatched parentheses"
+parseFactor input =
+    let (num, rest) = parseNum input           -- Parse a number directly
+    in (num, rest)
 -- Parse a number
 parseNum :: String -> (Tree, String)
 parseNum input =
-    let (num, rest) = span (`elem` "0123456789") input  -- Extract the number
-    in (NumNode (read num), rest)
+    let (num, rest) = span (`elem` (['0'..'9'] ++ ".")) input  -- Get the number part (supports decimals)
+    in if null num
+        then error "Expected a number"
+        else (NumNode (read num), rest)
 
+-- Top-level parse function
+parse :: String -> Tree
+parse input =
+    let (tree, rest) = parseAddSub input
+    in if null rest
+        then tree
+        else error $ "Unexpected input remaining: " ++ rest
+
+-- Main function to test expressions
 main :: IO ()
 main = do
-    let expression1 = "(2+4)*3"        -- Should parse as (2+4) * 3 = 18
-    let expression2 = "2*(3+4)"       -- Should parse as 2 * (3+4) = 14
-    let expression3 = "(2+3)*(4-1)"   -- Should parse as (2+3) * (4-1) = 15
-    print $ eval (parse expression1)  -- Should print 18
-    print $ eval (parse expression2)  -- Should print 14
-    print $ eval (parse expression3)  -- Should print 15
+    let expressions =
+            [ "(2+4)*3"
+            , "2*(3+4)-5"
+            , "(3+5)*(7-4)"
+            , "2*((3+5)*(7-4))"
+            , "((2+3)*(4+1))+7"
+            , "((8/2)+(3^2))*2"
+            , "3^2+(5*4)-8/2"
+            , "(2+3)*(4/2)+(6-1)"
+            , "5*(3+(2^3))-6"
+            , "10-(3+2)*4"
+            , "4^(2+1)-7"
+            , "((3+7)*(2-5))/2"
+            ]
+    mapM_ (print . eval . parse) expressions
