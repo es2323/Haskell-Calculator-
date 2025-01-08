@@ -38,11 +38,19 @@ parseMulDiv input =
 -- Parse exponentiation
 parseExp :: String -> (Tree, String)
 parseExp input =
-    let (lhs, rest) = parseNum input  -- Parse the left-hand side
+    let (lhs, rest) = parseFactor input  -- Parse the left-hand side
     in case rest of
         ('^':rhs) -> let (rhsTree, rest') = parseExp rhs
                      in (OpNode '^' lhs rhsTree, rest')
         _         -> (lhs, rest)  -- No more operators at this level
+
+-- Parse a factor (number or parenthesis)
+parseFactor :: String -> (Tree, String)
+parseFactor ('(':rest) = 
+    let parsedExpr = parseAddSub rest  -- Parse the expression inside parentheses
+        rest' = drop 1 $ dropWhile (/= ')') rest  -- Skip past the closing ')'
+    in (parsedExpr, rest')  -- Return the parsed expression and remaining input
+parseFactor input = parseNum input  -- Otherwise, parse a number
 
 -- Parse a number
 parseNum :: String -> (Tree, String)
@@ -52,9 +60,9 @@ parseNum input =
 
 main :: IO ()
 main = do
-    let expression1 = "2+4*3"        -- 2 + (4 * 3) = 14
-    let expression2 = "3^2+4*2"     -- (3^2) + (4 * 2) = 9 + 8 = 17
-    let expression3 = "10-2/2"      -- 10 - (2 / 2) = 10 - 1 = 9
-    print $ eval (parse expression1)  -- Should print 14
-    print $ eval (parse expression2)  -- Should print 17
-    print $ eval (parse expression3)  -- Should print 9
+    let expression1 = "(2+4)*3"        -- Should parse as (2+4) * 3 = 18
+    let expression2 = "2*(3+4)"       -- Should parse as 2 * (3+4) = 14
+    let expression3 = "(2+3)*(4-1)"   -- Should parse as (2+3) * (4-1) = 15
+    print $ eval (parse expression1)  -- Should print 18
+    print $ eval (parse expression2)  -- Should print 14
+    print $ eval (parse expression3)  -- Should print 15
