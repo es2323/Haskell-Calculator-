@@ -48,8 +48,11 @@ parseExp input =
             in (OpNode '^' lhs rhsTree, rest')
         _ -> (lhs, rest)  -- No more operators at this level
 
--- Parse a factor (number or parenthesis)
+-- Parse a factor (number, parenthesis, or negative sign)
 parseFactor :: String -> (Tree, String)
+parseFactor ('-':rest) =
+    let (tree, rest') = parseFactor rest  -- Parse the rest of the factor as a negative number
+    in (OpNode '-' (NumNode 0) tree, rest')  -- Represent "-x" as "0 - x"
 parseFactor ('(':rest) =
     let (parsedExpr, rest') = parseAddSub rest  -- Parse inside parentheses recursively
     in case rest' of
@@ -78,17 +81,13 @@ parse input =
 main :: IO ()
 main = do
     let expressions =
-            [ "(2+4)*3"
-            , "2*(3+4)-5"
-            , "(3+5)*(7-4)"
-            , "2*((3+5)*(7-4))"
-            , "((2+3)*(4+1))+7"
-            , "((8/2)+(3^2))*2"
-            , "3^2+(5*4)-8/2"
-            , "(2+3)*(4/2)+(6-1)"
-            , "5*(3+(2^3))-6"
-            , "10-(3+2)*4"
-            , "4^(2+1)-7"
-            , "((3+7)*(2-5))/2"
+            [ "-5+3"
+            , "2*(-3)"
+            , "-(3+5)*2"
+            , "4+(-2*3)"
+            , "3+(-4)^2"
+            , "-(2+(3*(-4)))"
+            , "2^(-3)"
+            , "((3-7)*(-2))/2"
             ]
     mapM_ (print . eval . parse) expressions
