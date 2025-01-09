@@ -1,4 +1,6 @@
 -- Define the Tree data type
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+{-# HLINT ignore "Use isDigit" #-}
 data Tree = NumNode Double         -- Leaf node for numbers
           | OpNode Char Tree Tree  -- Operator node with two subtrees
           deriving (Show)
@@ -9,7 +11,9 @@ eval (NumNode n) = n                              -- Base case: return the numbe
 eval (OpNode '+' lhs rhs) = eval lhs + eval rhs  -- Evaluate and add
 eval (OpNode '-' lhs rhs) = eval lhs - eval rhs  -- Evaluate and subtract
 eval (OpNode '*' lhs rhs) = eval lhs * eval rhs  -- Evaluate and multiply
-eval (OpNode '/' lhs rhs) = eval lhs / eval rhs  -- Evaluate and divide
+eval (OpNode '/' lhs rhs)
+    | eval rhs == 0 = error "Division by zero"
+    | otherwise = eval lhs / eval rhs  -- Evaluate and divide
 eval (OpNode '^' lhs rhs) = eval lhs ** eval rhs -- Evaluate exponentiation
 
 -- Parse addition and subtraction
@@ -50,44 +54,66 @@ parseExp input =
 
 -- Parse a factor (number, parenthesis, or negative sign)
 parseFactor :: String -> (Tree, String)
-parseFactor ('-':rest) =
-    let (tree, rest') = parseFactor rest  -- Parse the rest of the factor as a negative number
-    in (OpNode '-' (NumNode 0) tree, rest')  -- Represent "-x" as "0 - x"
 parseFactor ('(':rest) =
     let (parsedExpr, rest') = parseAddSub rest  -- Parse inside parentheses recursively
     in case rest' of
-        (')':rest'') -> (parsedExpr, rest'')   -- Closing parenthesis
-        _            -> error "Mismatched parentheses"
-parseFactor input =
-    let (num, rest) = parseNum input           -- Parse a number directly
-    in (num, rest)
+        (')':rest'') -> (parsedExpr, rest'')  -- Closing parenthesis
+        _           -> error "Mismatched parentheses"
+parseFactor ('-':rest) =
+    let (parsedExpr, rest') = parseFactor rest
+    in (OpNode '-' (NumNode 0) parsedExpr, rest')  -- Handle unary minus
+parseFactor input = parseNum input  -- Parse a number directly
 -- Parse a number
 parseNum :: String -> (Tree, String)
 parseNum input =
-    let (num, rest) = span (`elem` (['0'..'9'] ++ ".")) input  -- Get the number part (supports decimals)
-    in if null num
-        then error "Expected a number"
-        else (NumNode (read num), rest)
+    let (num, rest) = spanValidNum input  -- Get the number part
+    in case reads num :: [(Double, String)] of
+        [(n, "")] -> (NumNode n, rest)
+        _          -> error ("Invalid number format: " ++ num)
 
--- Top-level parse function
-parse :: String -> Tree
-parse input =
-    let (tree, rest) = parseAddSub input
-    in if null rest
-        then tree
-        else error $ "Unexpected input remaining: " ++ rest
+-- Custom span function for valid number characters
+spanValidNum :: String -> (String, String)
+spanValidNum [] = ("", "")
+spanValidNum (x:xs)
+    | isDigit x || x == '.' = let (num, rest) = spanValidNum xs in (x:num, rest)
+    | otherwise = ("", x:xs)
 
--- Main function to test expressions
+-- Check if a character is a digit
+isDigit :: Char -> Bool
+isDigit c = c >= '0' && c <= '9'
+
+-- Safely parse and evaluate an expression
+safeEval :: String -> Either String Double
+safeEval input =
+    case parseSafe input of
+        Left err -> Left err
+        Right tree -> Right (eval tree)
+
+-- Safely parse an expression
+parseSafe :: String -> Either String Tree
+parseSafe input =
+    case parseAddSub input of
+        (tree, []) -> Right tree
+        (_, rest) -> Left ("Unexpected input: " ++ rest)
+
+-- Main function for testing
 main :: IO ()
 main = do
     let expressions =
-            [ "-5+3"
-            , "2*(-3)"
-            , "-(3+5)*2"
-            , "4+(-2*3)"
-            , "3+(-4)^2"
-            , "-(2+(3*(-4)))"
-            , "2^(-3)"
-            , "((3-7)*(-2))/2"
+            [ "(2+4)*3"
+            , "2*(3+4)-5"
+            , "(3+5)*(7-4)"
+            , "2*((3+5)*(7-4))"
+            , "((2+3)*(4+1))+7"
+            , "((8/2)+(3^2))*2"
+            , "3^2+(5*4)-8/2"
+            , "(2+3)*(4/2)+(6-1)"
+            , "5*(3+(2^3))-6"
+            , "10-(3+2)*4"
+            , "4^(2+1)-7"
+            , "((3+7)*(2-5))/2"
+            , "10/(5-5)"  -- Division by zero test
+            , "(3+7)*(2-"  -- Mismatched parentheses test
+            , "2**"         -- Invalid number format test"
             ]
-    mapM_ (print . eval . parse) expressions
+    mapM_ (print . safeEval) expressions
