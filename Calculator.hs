@@ -11,9 +11,11 @@ eval (NumNode n) = n                              -- Base case: return the numbe
 eval (OpNode '+' lhs rhs) = eval lhs + eval rhs  -- Evaluate and add
 eval (OpNode '-' lhs rhs) = eval lhs - eval rhs  -- Evaluate and subtract
 eval (OpNode '*' lhs rhs) = eval lhs * eval rhs  -- Evaluate and multiply
-eval (OpNode '/' lhs rhs)
-    | eval rhs == 0 = error "Division by zero"
-    | otherwise = eval lhs / eval rhs  -- Evaluate and divide
+eval (OpNode '/' lhs rhs) =
+    let denominator = eval rhs
+    in if denominator == 0
+       then error "Division by zero"  -- More explicit error message
+       else eval lhs / denominator
 eval (OpNode '^' lhs rhs) = eval lhs ** eval rhs -- Evaluate exponentiation
 
 -- Parse addition and subtraction
@@ -67,10 +69,11 @@ parseFactor input = parseNum input  -- Parse a number directly
 parseNum :: String -> (Tree, String)
 parseNum input =
     let (num, rest) = spanValidNum input  -- Get the number part
-    in case reads num :: [(Double, String)] of
-        [(n, "")] -> (NumNode n, rest)
-        _          -> error ("Invalid number format: " ++ num)
-
+        in if null num
+       then error ("Expected a number but found none at: " ++ rest)
+       else case reads num :: [(Double, String)] of
+            [(n, "")] -> (NumNode n, rest)
+            _         -> error ("Invalid number format: " ++ num)
 -- Custom span function for valid number characters
 spanValidNum :: String -> (String, String)
 spanValidNum [] = ("", "")
