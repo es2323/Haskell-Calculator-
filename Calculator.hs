@@ -1,6 +1,3 @@
-{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
-{-# HLINT ignore "Use isDigit" #-}
-
 -- Define the Tree data type
 data Tree = NumNode Double         -- Leaf node for numbers
           | OpNode Char Tree Tree  -- Operator node with two subtrees
