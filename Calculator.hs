@@ -108,21 +108,41 @@ parseSafe input =
 main :: IO ()
 main = do
     let expressions =
-            [ "(2+4)*3"
-            , "2*(3+4)-5"
-            , "(3+5)*(7-4)"
-            , "2*((3+5)*(7-4))"
-            , "((2+3)*(4+1))+7"
-            , "((8/2)+(3^2))*2"
-            , "3^2+(5*4)-8/2"
-            , "(2+3)*(4/2)+(6-1)"
-            , "5*(3+(2^3))-6"
-            , "10-(3+2)*4"
-            , "4^(2+1)-7"
-            , "((3+7)*(2-5))/2"
-            , "10%3"        -- Modulus test
-            , "10%(3-1)"    -- Modulus with parentheses test
-            , "(3+7)*(2-"  -- Mismatched parentheses test
-            , "2**"         -- Invalid number format test
+            [ "2+3"              -- Simple addition
+            , "5-2"              -- Simple subtraction
+            , "3*4"              -- Simple multiplication
+            , "8+2*3"            -- Addition and multiplication, multiplication has higher precedence
+            , "7-5*2"            -- Subtraction and multiplication, multiplication has higher precedence
+            , "4*(2+3)"          -- Parentheses to change precedence
+            , "3^2"              -- Exponentiation
+            , "2^(3+1)"          -- Exponentiation with parentheses inside
+            , "(2+1)^3"          -- Parentheses and exponentiation
+            , "4^2+2^3"          -- Mixed exponentiation with addition
+            , "5^(2+2)"          -- Exponentiation with parentheses inside
+            , "10%3"             -- Modulus operation
+            , "15%4"             -- Modulus operation
+            , "9%5"              -- Modulus operation
+            , "7%3"              -- Modulus operation
+            , "(13+9)%5"         -- Modulus with addition inside parentheses
+            , "(2+3)*4-5"        -- Multiplication and addition with subtraction
+            , "2*(3+4)-5"        -- Multiplication with parentheses, followed by subtraction
+            , "((2+3)*(4-1))"    -- Nested parentheses with multiplication
+            , "2+(3*(4+5))"      -- Nested parentheses with multiplication and addition
+            , "(2+5)*(7-4)+6"    -- Multiplication and addition with nested parentheses
+            , "2*3+4*(5-2)"      -- Mixed multiplication with addition and subtraction inside parentheses
+            , "3*(4+6)-2"        -- Multiplication with addition inside parentheses, followed by subtraction
+            , "(8-3)*(4+5)"      -- Parentheses with subtraction and addition, followed by multiplication
+            , "2*(5+3)-7"        -- Multiplication with addition inside parentheses, followed by subtraction
+            , "(5+8)*(2+1)"      -- Multiplication with nested parentheses
+            , "3*4+2^3"          -- Multiplication and exponentiation, followed by addition
+            , "2+5*(3-4)+6"      -- Addition with multiplication and subtraction inside parentheses
+            , "(3+2)*4-7+(5-2)"  -- Mixed operations with parentheses
+            , "4*(2+1)+5^2"      -- Multiplication with addition inside parentheses, followed by exponentiation
+            , "(3+5)*2+6^2"      -- Multiplication with addition inside parentheses, followed by exponentiation
+            , "((2+3)*(4+5))-2"  -- Nested parentheses with multiplication, followed by subtraction
+            , "(2+3)*(4+1)+(5*2)"-- Nested multiplication with addition
+            , "((3+2)*(7-4))+6"  -- Parentheses, multiplication, and addition
+            , "((4+1)*3)-(2+5)"  -- Multiplication inside parentheses, followed by subtraction
+            , "3+(4.6)+(5-2)^2"  -- Mixed addition, multiplication, and exponentiation inside parentheses
             ]
-    mapM_ (print . eval . fst . parseAddSub) expressions
+    mapM_ (print . safeEval) expressions  -- Evaluating and printing each expression
