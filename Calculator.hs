@@ -1,6 +1,7 @@
--- Define the Tree data type
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# HLINT ignore "Use isDigit" #-}
+
+-- Define the Tree data type
 data Tree = NumNode Double         -- Leaf node for numbers
           | OpNode Char Tree Tree  -- Operator node with two subtrees
           deriving (Show)
@@ -11,12 +12,13 @@ eval (NumNode n) = n                              -- Base case: return the numbe
 eval (OpNode '+' lhs rhs) = eval lhs + eval rhs  -- Evaluate and add
 eval (OpNode '-' lhs rhs) = eval lhs - eval rhs  -- Evaluate and subtract
 eval (OpNode '*' lhs rhs) = eval lhs * eval rhs  -- Evaluate and multiply
-eval (OpNode '/' lhs rhs) =
-    let denominator = eval rhs
-    in if denominator == 0
-       then error "Division by zero"  -- More explicit error message
-       else eval lhs / denominator
+eval (OpNode '/' lhs rhs) = eval lhs / eval rhs  -- Evaluate and divide
 eval (OpNode '^' lhs rhs) = eval lhs ** eval rhs -- Evaluate exponentiation
+eval (OpNode '%' lhs rhs) =                      -- Evaluate modulus
+    let lhsInt = round (eval lhs) :: Int 
+        rhsInt = round (eval rhs) :: Int
+    in fromIntegral (lhsInt `mod` rhsInt)  -- Modulus after converting to Int
+
 
 -- Parse addition and subtraction
 parseAddSub :: String -> (Tree, String)
@@ -31,7 +33,7 @@ parseAddSub input =
             in (OpNode '-' lhs rhsTree, rest')
         _ -> (lhs, rest)  -- No more operators at this level
 
--- Parse multiplication and division
+-- Parse multiplication, division, and modulus 
 parseMulDiv :: String -> (Tree, String)
 parseMulDiv input =
     let (lhs, rest) = parseExp input  -- Parse the left-hand side
@@ -42,6 +44,10 @@ parseMulDiv input =
         ('/':rhs) -> 
             let (rhsTree, rest') = parseMulDiv rhs
             in (OpNode '/' lhs rhsTree, rest')
+        ('%':rhs) -> 
+            let (rhsTree, rest') = parseMulDiv rhs
+            in (OpNode '%' lhs rhsTree, rest')
+        
         _ -> (lhs, rest)  -- No more operators at this level
 
 -- Parse exponentiation
@@ -69,11 +75,10 @@ parseFactor input = parseNum input  -- Parse a number directly
 parseNum :: String -> (Tree, String)
 parseNum input =
     let (num, rest) = spanValidNum input  -- Get the number part
-        in if null num
-       then error ("Expected a number but found none at: " ++ rest)
-       else case reads num :: [(Double, String)] of
+    in case reads num :: [(Double, String)] of
             [(n, "")] -> (NumNode n, rest)
             _         -> error ("Invalid number format: " ++ num)
+            
 -- Custom span function for valid number characters
 spanValidNum :: String -> (String, String)
 spanValidNum [] = ("", "")
@@ -115,8 +120,9 @@ main = do
             , "10-(3+2)*4"
             , "4^(2+1)-7"
             , "((3+7)*(2-5))/2"
-            , "10/(5-5)"  -- Division by zero test
+            , "10%3"        -- Modulus test
+            , "10%(3-1)"    -- Modulus with parentheses test
             , "(3+7)*(2-"  -- Mismatched parentheses test
-            , "2**"         -- Invalid number format test"
+            , "2**"         -- Invalid number format test
             ]
-    mapM_ (print . safeEval) expressions
+    mapM_ (print . eval . fst . parseAddSub) expressions
